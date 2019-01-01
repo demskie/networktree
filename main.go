@@ -19,13 +19,10 @@ func main() {
 }
 
 type geoDataV4 struct {
-	ipStart       *net.IP
-	ipEnd         *net.IP
-	registry      string
-	assigned      string
-	countryShort  string
-	countryMiddle string
-	countryLong   string
+	ipStart  *net.IP
+	ipEnd    *net.IP
+	country  string
+	position *Position
 }
 
 func ingestIPv4(path string) []geoDataV4 {
@@ -51,14 +48,15 @@ func ingestIPv4(path string) []geoDataV4 {
 		if err != nil {
 			continue
 		}
+		position, exists := countryPositions[lineColumns[4]]
+		if !exists {
+			log.Fatalf("country code '%v' has no defined position", lineColumns[4])
+		}
 		results = append(results, geoDataV4{
-			ipStart:       subnetmath.ConvertIntegerIPv4(uint64(start)),
-			ipEnd:         subnetmath.ConvertIntegerIPv4(uint64(end)),
-			registry:      lineColumns[2],
-			assigned:      lineColumns[3],
-			countryShort:  lineColumns[4],
-			countryMiddle: lineColumns[5],
-			countryLong:   lineColumns[6],
+			ipStart:  subnetmath.ConvertIntegerIPv4(uint64(start)),
+			ipEnd:    subnetmath.ConvertIntegerIPv4(uint64(end)),
+			country:  lineColumns[4],
+			position: position,
 		})
 	}
 	return results
