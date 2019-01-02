@@ -18,6 +18,7 @@ type node struct {
 // Tree contains the root nodes
 type Tree struct {
 	roots []*node
+	size  int
 }
 
 // NewTree creates a new Tree object
@@ -27,12 +28,21 @@ func NewTree() *Tree {
 	}
 }
 
-func (tree *Tree) insertIPv4(geoV4 *geoDataV4) {
-	for _, network := range geoV4.subnets {
+func (tree *Tree) Length() int {
+	return len(tree.roots)
+}
+
+func (tree *Tree) Size() int {
+	return tree.size
+}
+
+func (tree *Tree) insertIPv4(subnets []*net.IPNet, country string, position *Position) {
+	for _, network := range subnets {
+		tree.size++
 		newNode := &node{
 			network:  network,
-			country:  geoV4.country,
-			position: geoV4.position,
+			country:  country,
+			position: position,
 			parent:   getDeepestParent(network, tree.roots),
 		}
 		if newNode.parent != nil {

@@ -3,37 +3,44 @@ package main
 import (
 	"bufio"
 	"encoding/csv"
+	"fmt"
 	"io"
 	"log"
-	"net"
 	"os"
 	"path"
 	"strconv"
 	"strings"
+	"sync/atomic"
+	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/demskie/subnetmath"
 )
 
 func main() {
-	rawGeoData := ingestIPv4("src/github.com/demskie/networktree/IpToCountry.csv")
-	spew.Dump(rawGeoData)
+	t := time.Now()
+	ingestIPv4("src/github.com/demskie/networktree/IpToCountry.csv")
+	fmt.Println(time.Since(t))
 }
 
-type geoDataV4 struct {
-	subnets  []*net.IPNet
-	country  string
-	position *Position
-}
-
-func ingestIPv4(p string) []geoDataV4 {
+func ingestIPv4(p string) {
 	gopath, _ := os.LookupEnv("GOPATH")
 	csvFile, err := os.Open(path.Join(gopath, p))
 	if err != nil {
 		log.Fatalf("unable to ingest IPv4 data because: %v", err)
 	}
-	results := []geoDataV4{}
+	tree := NewTree()
 	reader := csv.NewReader(bufio.NewReader(csvFile))
+
+	rate := uint64(0)
+	ticker := time.NewTicker(time.Second)
+	go func() {
+		for range ticker.C {
+			fmt.Printf("%v insertions/second\n", atomic.SwapUint64(&rate, 0))
+			fmt.Printf("%v root size\n", tree.Length())
+			fmt.Printf("%v tree size\n\n", tree.Size())
+		}
+	}()
+
 	for {
 		lineColumns, err := reader.Read()
 		if err == io.EOF {
@@ -56,12 +63,13 @@ func ingestIPv4(p string) []geoDataV4 {
 		}
 		startAddr := subnetmath.ConvertV4IntegerToAddress(uint32(start))
 		endAddr := subnetmath.ConvertV4IntegerToAddress(uint32(end))
-		//fmt.Println(startAddr, endAddr, lineColumns[4])
-		results = append(results, geoDataV4{
-			subnets:  subnetmath.FindInbetweenV4Subnets(startAddr, endAddr),
-			country:  lineColumns[4],
-			position: position,
-		})
+		subnets := subnetmath.FindInbetweenV4Subnets(startAddr, endAddr)
+
+		country := lineColumns[4]
+
+		atomic.AddUint64(&rate, uint64(len(subnets)))
+
+		tree.insertIPv4(subnets, country, position)
 	}
-	return results
+	return
 }
