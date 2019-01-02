@@ -7,6 +7,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"path"
 	"strconv"
 	"strings"
 
@@ -15,18 +16,19 @@ import (
 )
 
 func main() {
-	spew.Dump(ingestIPv4("/Users/alex.demskie/go/src/github.com/demskie/networktree/IpToCountry.csv"))
+	rawGeoData := ingestIPv4("src/github.com/demskie/networktree/IpToCountry.csv")
+	spew.Dump(rawGeoData)
 }
 
 type geoDataV4 struct {
-	ipStart  *net.IP
-	ipEnd    *net.IP
+	subnets  []*net.IPNet
 	country  string
 	position *Position
 }
 
-func ingestIPv4(path string) []geoDataV4 {
-	csvFile, err := os.Open(path)
+func ingestIPv4(p string) []geoDataV4 {
+	gopath, _ := os.LookupEnv("GOPATH")
+	csvFile, err := os.Open(path.Join(gopath, p))
 	if err != nil {
 		log.Fatalf("unable to ingest IPv4 data because: %v", err)
 	}
@@ -52,9 +54,11 @@ func ingestIPv4(path string) []geoDataV4 {
 		if !exists {
 			log.Fatalf("country code '%v' has no defined position", lineColumns[4])
 		}
+		startAddr := subnetmath.ConvertV4IntegerToAddress(uint32(start))
+		endAddr := subnetmath.ConvertV4IntegerToAddress(uint32(end))
+		//fmt.Println(startAddr, endAddr, lineColumns[4])
 		results = append(results, geoDataV4{
-			ipStart:  subnetmath.ConvertIntegerIPv4(uint64(start)),
-			ipEnd:    subnetmath.ConvertIntegerIPv4(uint64(end)),
+			subnets:  subnetmath.FindInbetweenV4Subnets(startAddr, endAddr),
 			country:  lineColumns[4],
 			position: position,
 		})
