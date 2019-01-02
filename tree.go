@@ -36,6 +36,14 @@ func (tree *Tree) Size() int {
 	return tree.size
 }
 
+func (tree *Tree) insertAggregatesV4() {
+	networks := []*net.IPNet{subnetmath.ParseNetworkCIDR("0.0.0.0/8")}
+	for i := 0; i < 255; i++ {
+		tree.insertIPv4(networks, "ZZ", nil)
+		networks[0] = subnetmath.NextNetwork(networks[0])
+	}
+}
+
 func (tree *Tree) insertIPv4(subnets []*net.IPNet, country string, position *Position) {
 	for _, network := range subnets {
 		tree.size++

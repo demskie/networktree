@@ -29,6 +29,7 @@ func ingestIPv4(p string) {
 		log.Fatalf("unable to ingest IPv4 data because: %v", err)
 	}
 	tree := NewTree()
+	tree.insertAggregatesV4()
 	reader := csv.NewReader(bufio.NewReader(csvFile))
 
 	rate := uint64(0)
