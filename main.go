@@ -22,6 +22,12 @@ func main() {
 	fmt.Println(time.Since(t))
 }
 
+// http://ftp.apnic.net/stats/apnic/
+// http://ftp.apnic.net/stats/afrinic/
+// https://ftp.arin.net/pub/stats/arin/
+// https://ftp.lacnic.net/pub/stats/lacnic/
+// https://ftp.ripe.net/ripe/stats/
+
 func ingestIPv4(p string) {
 	gopath, _ := os.LookupEnv("GOPATH")
 	csvFile, err := os.Open(path.Join(gopath, p))
@@ -72,5 +78,8 @@ func ingestIPv4(p string) {
 
 		tree.insertIPv4(subnets, country, position)
 	}
-	return
+
+	ticker.Stop()
+
+	tree.Print()
 }

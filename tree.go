@@ -4,6 +4,7 @@ import (
 	"net"
 	"sort"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/demskie/subnetmath"
 )
 
@@ -34,6 +35,10 @@ func (tree *Tree) Length() int {
 
 func (tree *Tree) Size() int {
 	return tree.size
+}
+
+func (tree *Tree) Print() {
+	spew.Dump(tree.roots)
 }
 
 func (tree *Tree) insertAggregatesV4() {
@@ -126,7 +131,8 @@ func getDeepestParent(orig *net.IPNet, parents []*node) (parent *node) {
 
 func insertIntoSortedNodes(slc []*node, nd *node) []*node {
 	index := sort.Search(len(slc), func(i int) bool {
-		return subnetmath.NetworkComesBefore(slc[i].network, nd.network)
+		// BUG: is the NetworkComesBefore logic backwards?
+		return subnetmath.NetworkComesBefore(nd.network, slc[i].network)
 	})
 	slc = append(slc, &node{})
 	copy(slc[index+1:], slc[index:])
@@ -137,7 +143,8 @@ func insertIntoSortedNodes(slc []*node, nd *node) []*node {
 // BUG: do we need to offset this index in case of an exact match?
 func removeFromSortedNodes(slc []*node, nd *node) []*node {
 	index := sort.Search(len(slc), func(i int) bool {
-		return subnetmath.NetworkComesBefore(slc[i].network, nd.network)
+		// BUG: is the NetworkComesBefore logic backwards?
+		return subnetmath.NetworkComesBefore(nd.network, slc[i].network)
 	})
 	if slc[index] == nd {
 		copy(slc[index:], slc[index+1:])
