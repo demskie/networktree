@@ -66,6 +66,7 @@ func (tree *Tree) insertIPv4(subnets []*net.IPNet, country string, position *Pos
 	}
 }
 
+// OPTIMIZE: not using sort.Search()
 func insertWithParent(newNode *node, tree *Tree) {
 	// deletions will need to occur outside the upcoming loops to avoid corruption
 	var relocatedNodes []*node
@@ -73,11 +74,19 @@ func insertWithParent(newNode *node, tree *Tree) {
 	for _, sibling := range newNode.parent.children {
 		// see if we should be their parent
 		if newNode.network.Contains(sibling.network.IP) {
-			// remove child from previous parent
-			relocatedNodes = append(relocatedNodes, sibling)
-			// make ourselves the parent
-			sibling.parent = newNode
-			newNode.children = insertIntoSortedNodes(newNode.children, sibling)
+			// does this node already exist?
+			if subnetmath.NetworksAreIdentical(newNode.network, sibling.network) {
+				// override the values and do not insert
+				sibling.country = newNode.country
+				sibling.position = newNode.position
+				return
+			} else {
+				// remove child from previous parent
+				relocatedNodes = append(relocatedNodes, sibling)
+				// make ourselves the parent
+				sibling.parent = newNode
+				newNode.children = insertIntoSortedNodes(newNode.children, sibling)
+			}
 		}
 	}
 	// remove any nodes that were moved away from their original parent
@@ -90,6 +99,7 @@ func insertWithParent(newNode *node, tree *Tree) {
 	newNode.parent.children = insertIntoSortedNodes(newNode.parent.children, newNode)
 }
 
+// OPTIMIZE: not using sort.Search()
 func insertWithoutParent(newNode *node, tree *Tree) {
 	// deletions will need to occur outside the upcoming loops to avoid corruption
 	var relocatedNodes []*node
@@ -97,11 +107,19 @@ func insertWithoutParent(newNode *node, tree *Tree) {
 	for _, otherNode := range tree.roots {
 		// check if this other node should be our child
 		if newNode.network.Contains(otherNode.network.IP) {
-			// remove this node from the base of the tree
-			relocatedNodes = append(relocatedNodes, otherNode)
-			// make ourselves the parent
-			otherNode.parent = newNode
-			newNode.children = insertIntoSortedNodes(newNode.children, otherNode)
+			// ensure that this subnet does not already exist
+			if subnetmath.NetworksAreIdentical(newNode.network, otherNode.network) {
+				// override the values and do not insert
+				otherNode.country = newNode.country
+				otherNode.position = newNode.position
+				return
+			} else {
+				// remove this node from the base of the tree
+				relocatedNodes = append(relocatedNodes, otherNode)
+				// make ourselves the parent
+				otherNode.parent = newNode
+				newNode.children = insertIntoSortedNodes(newNode.children, otherNode)
+			}
 		}
 	}
 	// remove any nodes that were moved out from the base of the tree
