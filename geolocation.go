@@ -257,4 +257,5 @@ var countryPositions = map[string]*Position{
 	"BQ": &Position{12.1784, 68.2385},
 	"AP": &Position{34.0479, 100.6197},
 	"AX": &Position{60.1785, 19.9156},
+	"BL": &Position{17.9000, 62.8333},
 }

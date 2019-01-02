@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"os"
 	"path"
 	"strconv"
-	"strings"
 	"sync/atomic"
 	"time"
 
@@ -18,7 +18,7 @@ import (
 
 func main() {
 	t := time.Now()
-	ingestIPv4("src/github.com/demskie/networktree/IpToCountry.csv")
+	ingestARIN("src/github.com/demskie/networktree/delegated-arin-extended-latest")
 	fmt.Println(time.Since(t))
 }
 
@@ -28,15 +28,17 @@ func main() {
 // https://ftp.lacnic.net/pub/stats/lacnic/
 // https://ftp.ripe.net/ripe/stats/
 
-func ingestIPv4(p string) {
+func ingestARIN(p string) {
 	gopath, _ := os.LookupEnv("GOPATH")
-	csvFile, err := os.Open(path.Join(gopath, p))
+	txtFile, err := os.Open(path.Join(gopath, p))
 	if err != nil {
 		log.Fatalf("unable to ingest IPv4 data because: %v", err)
 	}
+	reader := csv.NewReader(bufio.NewReader(txtFile))
+	reader.Comma = '|'
+
 	tree := NewTree()
 	tree.insertAggregatesV4()
-	reader := csv.NewReader(bufio.NewReader(csvFile))
 
 	rate := uint64(0)
 	ticker := time.NewTicker(time.Second)
@@ -53,29 +55,26 @@ func ingestIPv4(p string) {
 		if err == io.EOF {
 			break
 		}
-		if len(lineColumns) < 7 || strings.HasPrefix(lineColumns[0], "#") {
+		if len(lineColumns) < 7 || lineColumns[2] != "ipv4" || lineColumns[3] == "*" {
 			continue
 		}
-		start, err := strconv.ParseInt(lineColumns[0], 10, 64)
-		if err != nil {
+		startAddr := net.ParseIP(lineColumns[3])
+		increment, err := strconv.ParseUint(lineColumns[4], 10, 64)
+		if startAddr == nil || err != nil {
 			continue
 		}
-		end, err := strconv.ParseInt(lineColumns[1], 10, 64)
-		if err != nil {
-			continue
-		}
-		position, exists := countryPositions[lineColumns[4]]
-		if !exists {
-			log.Fatalf("country code '%v' has no defined position", lineColumns[4])
-		}
-		startAddr := subnetmath.ConvertV4IntegerToAddress(uint32(start))
-		endAddr := subnetmath.ConvertV4IntegerToAddress(uint32(end))
+		startInteger := subnetmath.ConvertV4AddressToInteger(startAddr)
+		endAddr := subnetmath.ConvertV4IntegerToAddress(startInteger + uint32(increment) - 1)
 		subnets := subnetmath.FindInbetweenV4Subnets(startAddr, endAddr)
-
-		country := lineColumns[4]
-
+		country := lineColumns[1]
+		if country == "" {
+			country = "ZZ"
+		}
+		position, exists := countryPositions[country]
+		if !exists {
+			log.Fatalf("country code '%v' has no defined position", country)
+		}
 		atomic.AddUint64(&rate, uint64(len(subnets)))
-
 		tree.insertIPv4(subnets, country, position)
 	}
 
