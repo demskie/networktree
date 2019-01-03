@@ -4,7 +4,6 @@ import (
 	"net"
 	"sort"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/demskie/subnetmath"
 )
 
@@ -18,33 +17,25 @@ type node struct {
 
 // Tree contains the root nodes
 type Tree struct {
-	roots []*node
-	size  int
+	roots     []*node
+	precision int
+	size      int
 }
 
 // NewTree creates a new Tree object
-func NewTree() *Tree {
+func NewTree(precision int) *Tree {
 	return &Tree{
-		roots: make([]*node, 0),
+		roots:     make([]*node, 0),
+		precision: precision,
 	}
-}
-
-func (tree *Tree) Length() int {
-	return len(tree.roots)
 }
 
 func (tree *Tree) Size() int {
 	return tree.size
 }
 
-func (tree *Tree) Print() {
-	spew.Dump(tree.roots)
-}
-
-const bucketPrecision = 128
-
-func (tree *Tree) insertIPv4(subnets []*net.IPNet, country string, position *Position) {
-	for _, network := range subnets {
+func (tree *Tree) insert(networks []*net.IPNet, country string, position *Position) {
+	for _, network := range networks {
 		tree.size++
 		newNode := &node{
 			network:  network,
@@ -54,12 +45,12 @@ func (tree *Tree) insertIPv4(subnets []*net.IPNet, country string, position *Pos
 		}
 		if newNode.parent != nil {
 			insertWithParent(newNode)
-			if len(newNode.parent.children) > bucketPrecision {
+			if len(newNode.parent.children) > tree.precision {
 				splitNodes(newNode.parent.children, nil)
 			}
 		} else {
 			insertWithoutParent(newNode, tree)
-			if len(tree.roots) > bucketPrecision {
+			if len(tree.roots) > tree.precision {
 				splitNodes(tree.roots, tree)
 			}
 		}
@@ -109,10 +100,8 @@ func splitNodes(nodes []*node, tree *Tree) {
 	if first.IP.To4() == nil || last.IP.To4() == nil {
 		return
 	}
-	lastInt := subnetmath.ConvertV4AddressToInteger(last.IP)
-	lastInt += uint32(subnetmath.AddressCountBigInt(last).Uint64()) - 1
-	lastAddr := subnetmath.ConvertV4IntegerToAddress(lastInt)
-	subnets := subnetmath.FindInbetweenV4Subnets(first.IP, lastAddr)
+	lastAddr := subnetmath.BroadcastAddr(last)
+	subnets := subnetmath.FindInbetweenSubnets(first.IP, lastAddr)
 	for _, subnet := range subnets {
 		// blindly insert this aggregate as any duplicates will be discarded
 		if tree == nil {

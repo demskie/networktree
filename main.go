@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math/big"
 	"net"
 	"os"
 	"path"
@@ -37,14 +38,13 @@ func ingestARIN(p string) {
 	reader := csv.NewReader(bufio.NewReader(txtFile))
 	reader.Comma = '|'
 
-	tree := NewTree()
+	tree := NewTree(32)
 
 	rate := uint64(0)
 	ticker := time.NewTicker(time.Second)
 	go func() {
 		for range ticker.C {
 			fmt.Printf("%v insertions/second\n", atomic.SwapUint64(&rate, 0))
-			fmt.Printf("%v root size\n", tree.Length())
 			fmt.Printf("%v tree size\n\n", tree.Size())
 		}
 	}()
@@ -59,12 +59,14 @@ func ingestARIN(p string) {
 		}
 		startAddr := net.ParseIP(lineColumns[3])
 		increment, err := strconv.ParseUint(lineColumns[4], 10, 64)
-		if startAddr == nil || err != nil {
+		if startAddr == nil || err != nil || increment%2 != 0 {
 			continue
 		}
-		startInteger := subnetmath.ConvertV4AddressToInteger(startAddr)
-		endAddr := subnetmath.ConvertV4IntegerToAddress(startInteger + uint32(increment) - 1)
-		subnets := subnetmath.FindInbetweenV4Subnets(startAddr, endAddr)
+		stopBigInt := subnetmath.AddrToInt(startAddr)
+		stopBigInt.Add(stopBigInt, big.NewInt(int64(increment)))
+		stopBigInt.Sub(stopBigInt, big.NewInt(1))
+		stopAddr := subnetmath.IntToAddr(stopBigInt)
+		networks := subnetmath.FindInbetweenSubnets(startAddr, stopAddr)
 		country := lineColumns[1]
 		if country == "" {
 			country = "ZZ"
@@ -73,17 +75,7 @@ func ingestARIN(p string) {
 		if !exists {
 			log.Fatalf("country code '%v' has no defined position", country)
 		}
-		atomic.AddUint64(&rate, uint64(len(subnets)))
-		tree.insertIPv4(subnets, country, position)
+		atomic.AddUint64(&rate, uint64(1))
+		tree.insert(networks, country, position)
 	}
-
-	ticker.Stop()
-	for _, nd := range tree.roots {
-		fmt.Println(nd.network)
-		for _, cd := range nd.children {
-			fmt.Println("  " + cd.network.String())
-		}
-		fmt.Println()
-	}
-	//tree.Print()
 }
