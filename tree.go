@@ -3,6 +3,7 @@ package main
 import (
 	"net"
 	"sort"
+	"sync/atomic"
 
 	"github.com/demskie/subnetmath"
 )
@@ -40,11 +41,13 @@ func (tree *Tree) insert(networks []*net.IPNet, country string, position *Positi
 		parent := getDeepestParent(network, tree.roots)
 		newNode := &node{network, country, position, parent, nil}
 		if newNode.parent != nil {
+			atomic.AddUint64(&parentRate, 1)
 			insertWithParent(newNode)
 			if len(newNode.parent.children) > tree.precision {
 				splitNodes(newNode.parent.children, nil)
 			}
 		} else {
+			atomic.AddUint64(&noParentRate, 1)
 			insertWithoutParent(newNode, tree)
 			if len(tree.roots) > tree.precision {
 				splitNodes(tree.roots, tree)
@@ -162,7 +165,7 @@ func getDeepestParent(orig *net.IPNet, parents []*node) *node {
 			if deeper != nil {
 				return deeper
 			}
-			return nil
+			return nd
 		}
 	}
 	return nil

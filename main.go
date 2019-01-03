@@ -3,13 +3,16 @@ package main
 import (
 	"bufio"
 	"encoding/csv"
+	"flag"
 	"fmt"
 	"io"
 	"log"
 	"math/big"
 	"net"
 	"os"
+	"os/signal"
 	"path"
+	"runtime/pprof"
 	"strconv"
 	"sync/atomic"
 	"time"
@@ -17,19 +20,66 @@ import (
 	"github.com/demskie/subnetmath"
 )
 
+const arinPath = "src/github.com/demskie/networktree/inputdata/delegated-arin-extended-latest"    // https://ftp.arin.net/pub/stats/arin/
+const ripePath = "src/github.com/demskie/networktree/inputdata/delegated-ripencc-extended-latest" // https://ftp.ripe.net/ripe/stats/
+// http://ftp.apnic.net/stats/apnic/
+// http://ftp.apnic.net/stats/afrinic/
+// https://ftp.lacnic.net/pub/stats/lacnic/
+
 func main() {
+
+	tree := NewTree(32)
+
+	cpuprofile := flag.String("cpuprofile", "", "write cpu profile to file")
+	flag.Parse()
+	if *cpuprofile != "" {
+		f, err := os.Create(*cpuprofile)
+		if err != nil {
+			log.Fatal(err)
+		}
+		pprof.StartCPUProfile(f)
+		defer pprof.StopCPUProfile()
+		c := make(chan os.Signal, 1)
+		signal.Notify(c, os.Interrupt)
+		go func() {
+			for range c {
+				pprof.StopCPUProfile()
+				f2, _ := os.Create("output.json")
+				f2.Truncate(0)
+				f2.Seek(0, 0)
+				f2.WriteString(tree.JSON())
+				os.Exit(1)
+			}
+		}()
+	}
+
 	t := time.Now()
-	ingestARIN("src/github.com/demskie/networktree/delegated-arin-extended-latest")
+
+	ingest(tree, arinPath)
+	ingest(tree, ripePath)
+
 	fmt.Println(time.Since(t))
 }
 
-// http://ftp.apnic.net/stats/apnic/
-// http://ftp.apnic.net/stats/afrinic/
-// https://ftp.arin.net/pub/stats/arin/
-// https://ftp.lacnic.net/pub/stats/lacnic/
-// https://ftp.ripe.net/ripe/stats/
+var rate uint64
+var parentRate uint64
+var noParentRate uint64
+var ticker *time.Ticker
 
-func ingestARIN(p string) {
+func init() {
+	ticker = time.NewTicker(time.Second)
+	go func() {
+		var total uint64
+		for range ticker.C {
+			old := atomic.SwapUint64(&rate, 0)
+			total += old
+			fmt.Printf("%v count/sec\t %v total\t %v insertWithParent()\t %v insertWithoutParent()\n",
+				old, total, atomic.SwapUint64(&parentRate, 0), atomic.SwapUint64(&noParentRate, 0))
+		}
+	}()
+}
+
+func ingest(tree *Tree, p string) {
 	gopath, _ := os.LookupEnv("GOPATH")
 	txtFile, err := os.Open(path.Join(gopath, p))
 	if err != nil {
@@ -38,23 +88,12 @@ func ingestARIN(p string) {
 	reader := csv.NewReader(bufio.NewReader(txtFile))
 	reader.Comma = '|'
 
-	tree := NewTree(32)
-
-	rate := uint64(0)
-	ticker := time.NewTicker(time.Second)
-	go func() {
-		for range ticker.C {
-			fmt.Printf("%v insertions/second\n", atomic.SwapUint64(&rate, 0))
-			fmt.Printf("%v tree size\n\n", tree.Size())
-		}
-	}()
-
 	for {
 		lineColumns, err := reader.Read()
 		if err == io.EOF {
 			break
 		}
-		if len(lineColumns) < 7 || lineColumns[2] != "ipv4" || lineColumns[3] == "*" {
+		if len(lineColumns) < 5 || lineColumns[2] != "ipv4" || lineColumns[3] == "*" {
 			continue
 		}
 		startAddr := net.ParseIP(lineColumns[3])
@@ -75,8 +114,8 @@ func ingestARIN(p string) {
 		if !exists {
 			log.Fatalf("country code '%v' has no defined position", country)
 		}
-		atomic.AddUint64(&rate, uint64(1))
+		atomic.AddUint64(&rate, uint64(len(networks)))
 		tree.insert(networks, country, position)
 	}
-	fmt.Println(tree.JSON())
+	//fmt.Println(tree.JSON())
 }
