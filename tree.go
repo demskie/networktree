@@ -49,6 +49,8 @@ func (tree *Tree) insertAggregatesV4() {
 	}
 }
 
+const bucketPrecision = 128
+
 func (tree *Tree) insertIPv4(subnets []*net.IPNet, country string, position *Position) {
 	for _, network := range subnets {
 		tree.size++
@@ -59,15 +61,21 @@ func (tree *Tree) insertIPv4(subnets []*net.IPNet, country string, position *Pos
 			parent:   getDeepestParent(network, tree.roots),
 		}
 		if newNode.parent != nil {
-			insertWithParent(newNode, tree)
+			insertWithParent(newNode)
+			if len(newNode.parent.children) > bucketPrecision {
+				splitNodes(newNode.parent.children)
+			}
 		} else {
 			insertWithoutParent(newNode, tree)
+			if len(tree.roots) > bucketPrecision {
+				//splitRootNodes(tree.roots, tree)
+			}
 		}
 	}
 }
 
 // OPTIMIZE: not using sort.Search()
-func insertWithParent(newNode *node, tree *Tree) {
+func insertWithParent(newNode *node) {
 	// deletions will need to occur outside the upcoming loops to avoid corruption
 	var relocatedNodes []*node
 	// sweep through adjacent children
@@ -76,17 +84,20 @@ func insertWithParent(newNode *node, tree *Tree) {
 		if newNode.network.Contains(sibling.network.IP) {
 			// does this node already exist?
 			if subnetmath.NetworksAreIdentical(newNode.network, sibling.network) {
-				// override the values and do not insert
-				sibling.country = newNode.country
-				sibling.position = newNode.position
+				// override values of a node with 'unspecified' or 'nil' values
+				if sibling.country == "ZZ" {
+					sibling.country = newNode.country
+					sibling.position = newNode.position
+				}
+				// do not insert
 				return
-			} else {
-				// remove child from previous parent
-				relocatedNodes = append(relocatedNodes, sibling)
-				// make ourselves the parent
-				sibling.parent = newNode
-				newNode.children = insertIntoSortedNodes(newNode.children, sibling)
 			}
+			// remove child from previous parent
+			relocatedNodes = append(relocatedNodes, sibling)
+			// make ourselves the parent
+			sibling.parent = newNode
+			newNode.children = insertIntoSortedNodes(newNode.children, sibling)
+
 		}
 	}
 	// remove any nodes that were moved away from their original parent
@@ -99,6 +110,28 @@ func insertWithParent(newNode *node, tree *Tree) {
 	newNode.parent.children = insertIntoSortedNodes(newNode.parent.children, newNode)
 }
 
+func splitNodes(nodes []*node) {
+	first := nodes[0].network
+	last := nodes[len(nodes)-1].network
+	// BUG: v6 is unsupported/untested at the moment
+	if first.IP.To4() == nil || last.IP.To4() == nil {
+		return
+	}
+	lastInt := subnetmath.ConvertV4AddressToInteger(last.IP)
+	lastInt += uint32(subnetmath.AddressCountBigInt(last).Uint64()) - 1
+	lastAddr := subnetmath.ConvertV4IntegerToAddress(lastInt)
+	subnets := subnetmath.FindInbetweenV4Subnets(first.IP, lastAddr)
+	for _, subnet := range subnets {
+		// blindly insert this aggregate as any duplicates will be discarded
+		insertWithParent(&node{
+			network:  subnet,
+			country:  "ZZ",
+			position: nil,
+			parent:   nodes[0].parent,
+		})
+	}
+}
+
 // OPTIMIZE: not using sort.Search()
 func insertWithoutParent(newNode *node, tree *Tree) {
 	// deletions will need to occur outside the upcoming loops to avoid corruption
@@ -109,17 +142,19 @@ func insertWithoutParent(newNode *node, tree *Tree) {
 		if newNode.network.Contains(otherNode.network.IP) {
 			// ensure that this subnet does not already exist
 			if subnetmath.NetworksAreIdentical(newNode.network, otherNode.network) {
-				// override the values and do not insert
-				otherNode.country = newNode.country
-				otherNode.position = newNode.position
+				// override values of a node with 'unspecified' or 'nil' values
+				if otherNode.country == "ZZ" {
+					otherNode.country = newNode.country
+					otherNode.position = newNode.position
+				}
+				// do not insert
 				return
-			} else {
-				// remove this node from the base of the tree
-				relocatedNodes = append(relocatedNodes, otherNode)
-				// make ourselves the parent
-				otherNode.parent = newNode
-				newNode.children = insertIntoSortedNodes(newNode.children, otherNode)
 			}
+			// remove this node from the base of the tree
+			relocatedNodes = append(relocatedNodes, otherNode)
+			// make ourselves the parent
+			otherNode.parent = newNode
+			newNode.children = insertIntoSortedNodes(newNode.children, otherNode)
 		}
 	}
 	// remove any nodes that were moved out from the base of the tree

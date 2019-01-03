@@ -80,5 +80,5 @@ func ingestARIN(p string) {
 
 	ticker.Stop()
 
-	tree.Print()
+	//tree.Print()
 }
