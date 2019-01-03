@@ -3,16 +3,13 @@ package main
 import (
 	"bufio"
 	"encoding/csv"
-	"flag"
 	"fmt"
 	"io"
 	"log"
 	"math/big"
 	"net"
 	"os"
-	"os/signal"
 	"path"
-	"runtime/pprof"
 	"strconv"
 	"sync/atomic"
 	"time"
@@ -28,37 +25,14 @@ const ripePath = "src/github.com/demskie/networktree/inputdata/delegated-ripencc
 
 func main() {
 
-	tree := NewTree(32)
-
-	cpuprofile := flag.String("cpuprofile", "", "write cpu profile to file")
-	flag.Parse()
-	if *cpuprofile != "" {
-		f, err := os.Create(*cpuprofile)
-		if err != nil {
-			log.Fatal(err)
-		}
-		pprof.StartCPUProfile(f)
-		defer pprof.StopCPUProfile()
-		c := make(chan os.Signal, 1)
-		signal.Notify(c, os.Interrupt)
-		go func() {
-			for range c {
-				pprof.StopCPUProfile()
-				f2, _ := os.Create("output.json")
-				f2.Truncate(0)
-				f2.Seek(0, 0)
-				f2.WriteString(tree.JSON())
-				os.Exit(1)
-			}
-		}()
-	}
-
 	t := time.Now()
 
+	tree := NewTree(32)
 	ingest(tree, arinPath)
 	ingest(tree, ripePath)
 
-	fmt.Println(time.Since(t))
+	ticker.Stop()
+	fmt.Println("finished in", time.Since(t))
 }
 
 var rate uint64
@@ -73,7 +47,7 @@ func init() {
 		for range ticker.C {
 			old := atomic.SwapUint64(&rate, 0)
 			total += old
-			fmt.Printf("%v count/sec\t %v total\t %v insertWithParent()\t %v insertWithoutParent()\n",
+			fmt.Printf("%v count/sec    %v total    %v insertWithParent()    %v insertWithoutParent()\n",
 				old, total, atomic.SwapUint64(&parentRate, 0), atomic.SwapUint64(&noParentRate, 0))
 		}
 	}()
