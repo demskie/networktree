@@ -37,12 +37,8 @@ func (tree *Tree) Size() int {
 func (tree *Tree) insert(networks []*net.IPNet, country string, position *Position) {
 	for _, network := range networks {
 		tree.size++
-		newNode := &node{
-			network:  network,
-			country:  country,
-			position: position,
-			parent:   getDeepestParent(network, tree.roots),
-		}
+		parent := getDeepestParent(network, tree.roots)
+		newNode := &node{network, country, position, parent, nil}
 		if newNode.parent != nil {
 			insertWithParent(newNode)
 			if len(newNode.parent.children) > tree.precision {
@@ -157,7 +153,7 @@ func insertWithoutParent(newNode *node, tree *Tree) {
 	tree.roots = insertIntoSortedNodes(tree.roots, newNode)
 }
 
-func getDeepestParent(orig *net.IPNet, parents []*node) (parent *node) {
+func getDeepestParent(orig *net.IPNet, parents []*node) *node {
 	for _, nd := range parents {
 		snMask, _ := nd.network.Mask.Size()
 		origMask, _ := orig.Mask.Size()
@@ -166,7 +162,7 @@ func getDeepestParent(orig *net.IPNet, parents []*node) (parent *node) {
 			if deeper != nil {
 				return deeper
 			}
-			return nd
+			return nil
 		}
 	}
 	return nil

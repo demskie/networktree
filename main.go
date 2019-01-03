@@ -78,4 +78,5 @@ func ingestARIN(p string) {
 		atomic.AddUint64(&rate, uint64(1))
 		tree.insert(networks, country, position)
 	}
+	fmt.Println(tree.JSON())
 }
