@@ -38,7 +38,6 @@ func ingestARIN(p string) {
 	reader.Comma = '|'
 
 	tree := NewTree()
-	tree.insertAggregatesV4()
 
 	rate := uint64(0)
 	ticker := time.NewTicker(time.Second)
@@ -79,6 +78,12 @@ func ingestARIN(p string) {
 	}
 
 	ticker.Stop()
-
+	for _, nd := range tree.roots {
+		fmt.Println(nd.network)
+		for _, cd := range nd.children {
+			fmt.Println("  " + cd.network.String())
+		}
+		fmt.Println()
+	}
 	//tree.Print()
 }

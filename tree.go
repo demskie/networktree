@@ -41,14 +41,6 @@ func (tree *Tree) Print() {
 	spew.Dump(tree.roots)
 }
 
-func (tree *Tree) insertAggregatesV4() {
-	networks := []*net.IPNet{subnetmath.ParseNetworkCIDR("0.0.0.0/8")}
-	for i := 0; i < 255; i++ {
-		tree.insertIPv4(networks, "ZZ", nil)
-		networks[0] = subnetmath.NextNetwork(networks[0])
-	}
-}
-
 const bucketPrecision = 128
 
 func (tree *Tree) insertIPv4(subnets []*net.IPNet, country string, position *Position) {
@@ -63,12 +55,12 @@ func (tree *Tree) insertIPv4(subnets []*net.IPNet, country string, position *Pos
 		if newNode.parent != nil {
 			insertWithParent(newNode)
 			if len(newNode.parent.children) > bucketPrecision {
-				splitNodes(newNode.parent.children)
+				splitNodes(newNode.parent.children, nil)
 			}
 		} else {
 			insertWithoutParent(newNode, tree)
 			if len(tree.roots) > bucketPrecision {
-				//splitRootNodes(tree.roots, tree)
+				splitNodes(tree.roots, tree)
 			}
 		}
 	}
@@ -110,7 +102,7 @@ func insertWithParent(newNode *node) {
 	newNode.parent.children = insertIntoSortedNodes(newNode.parent.children, newNode)
 }
 
-func splitNodes(nodes []*node) {
+func splitNodes(nodes []*node, tree *Tree) {
 	first := nodes[0].network
 	last := nodes[len(nodes)-1].network
 	// BUG: v6 is unsupported/untested at the moment
@@ -123,12 +115,21 @@ func splitNodes(nodes []*node) {
 	subnets := subnetmath.FindInbetweenV4Subnets(first.IP, lastAddr)
 	for _, subnet := range subnets {
 		// blindly insert this aggregate as any duplicates will be discarded
-		insertWithParent(&node{
-			network:  subnet,
-			country:  "ZZ",
-			position: nil,
-			parent:   nodes[0].parent,
-		})
+		if tree == nil {
+			insertWithParent(&node{
+				network:  subnet,
+				country:  "ZZ",
+				position: nil,
+				parent:   nodes[0].parent,
+			})
+		} else {
+			insertWithoutParent(&node{
+				network:  subnet,
+				country:  "ZZ",
+				position: nil,
+				parent:   nil,
+			}, tree)
+		}
 	}
 }
 
