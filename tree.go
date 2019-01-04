@@ -207,3 +207,31 @@ func removeNodeFromSlice(slc []*node, nd *node) []*node {
 	}
 	return slc
 }
+
+func findNetwork(address net.IP, nodes []*node) *node {
+	for _, nd := range nodes {
+		if nd.network.Contains(address) {
+			if nd.children != nil && len(nd.children) > 0 {
+				return findNetwork(address, nd.children)
+			}
+			return nd
+		}
+	}
+	return nil
+}
+
+func findClosestSupernet(network *net.IPNet, nodes []*node) *node {
+	for _, nd := range nodes {
+		if subnetmath.NetworkContainsSubnet(nd.network, network) {
+			if nd.children != nil && len(nd.children) > 0 {
+				canidateSupernet := findClosestSupernet(network, nd.children)
+				if canidateSupernet != nil {
+					return canidateSupernet
+				}
+				return nd
+			}
+			return nd
+		}
+	}
+	return nil
+}

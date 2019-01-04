@@ -24,7 +24,6 @@ const ripePath = "src/github.com/demskie/networktree/inputdata/delegated-ripencc
 // https://ftp.lacnic.net/pub/stats/lacnic/
 
 func main() {
-
 	t := time.Now()
 
 	tree := NewTree(32)
@@ -33,6 +32,9 @@ func main() {
 
 	ticker.Stop()
 	fmt.Println("finished in", time.Since(t))
+
+	fmt.Println(findNetwork(net.ParseIP("8.8.8.8"), tree.roots).network)
+	fmt.Println(findClosestSupernet(subnetmath.ParseNetworkCIDR("8.0.0.0/8"), tree.roots).network)
 }
 
 var rate uint64
@@ -91,5 +93,4 @@ func ingest(tree *Tree, p string) {
 		atomic.AddUint64(&rate, uint64(len(networks)))
 		tree.insert(networks, country, position)
 	}
-	//fmt.Println(tree.JSON())
 }
