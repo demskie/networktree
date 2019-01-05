@@ -33,8 +33,10 @@ func main() {
 	ticker.Stop()
 	fmt.Println("finished in", time.Since(t))
 
-	fmt.Println(findNetwork(net.ParseIP("8.8.8.8"), tree.roots).network)
-	fmt.Println(findClosestSupernet(subnetmath.ParseNetworkCIDR("8.0.0.0/8"), tree.roots).network)
+	f, _ := os.Create("output.json")
+	f.Truncate(0)
+	f.Seek(0, 0)
+	f.WriteString(tree.JSON())
 }
 
 var rate uint64
