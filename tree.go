@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"net"
 	"sort"
 	"sync/atomic"
@@ -88,14 +87,25 @@ func insertNode(tree *Tree, newNode *node) {
 
 	if newNode.parent != nil {
 		newNode.parent.children = insertIntoSortedNodes(newNode.parent.children, newNode)
-		if len(newNode.parent.children) > tree.precision {
-			splitNodes(newNode.parent.children, tree)
+		for len(newNode.parent.children) > tree.precision {
+			splitParent(newNode.parent, tree)
 		}
 	} else {
 		tree.roots = insertIntoSortedNodes(tree.roots, newNode)
 		if len(tree.roots) > tree.precision {
 			splitNodes(tree.roots, tree)
 		}
+	}
+}
+
+func splitParent(parent *node, tree *Tree) {
+	copiedNetwork := subnetmath.DuplicateNetwork(parent.network)
+	smallerNetwork := subnetmath.ShrinkNetwork(copiedNetwork)
+	if smallerNetwork != nil {
+		tree.insert([]*net.IPNet{
+			smallerNetwork,
+			subnetmath.NextNetwork(smallerNetwork),
+		}, "ZZZZZZ", nil)
 	}
 }
 
@@ -160,36 +170,22 @@ func findNetwork(address net.IP, nodes []*node) *node {
 	return nil
 }
 
-// searchedIndex: 11	 actualIndex: 7	 length: 11
-// >>>204.29.8.0/23<<< 3.0.0.0/8 4.0.0.0/6 8.0.0.0/5 16.0.0.0/4 32.0.0.0/3 64.0.0.0/2 128.0.0.0/2 192.0.0.0/4 208.0.0.0/5 216.0.0.0/8 217.147.184.0/21
-
 func findClosestSupernet(network *net.IPNet, nodes []*node) *node {
-	searchedIndex := sort.Search(len(nodes), func(i int) bool {
+	idx := sort.Search(len(nodes), func(i int) bool {
 		return subnetmath.NetworkComesBefore(network, nodes[i].network) ||
 			subnetmath.NetworkContainsSubnet(nodes[i].network, network)
 	})
-	actualIndex := 0
-	for _, nd := range nodes {
-		if subnetmath.NetworkContainsSubnet(nd.network, network) {
-			if searchedIndex != actualIndex {
-				fmt.Printf("searchedIndex: %v\t actualIndex: %v\t length: %v\n",
-					searchedIndex, actualIndex, len(nodes))
-				s := ">>>" + network.String() + "<<<"
-				for _, val := range nodes {
-					s += " " + val.network.String()
-				}
-				fmt.Println(s + "\n")
-			}
-			if nd.children != nil && len(nd.children) > 0 {
-				canidateSupernet := findClosestSupernet(network, nd.children)
+	for idx < len(nodes) {
+		if subnetmath.NetworkContainsSubnet(nodes[idx].network, network) {
+			if nodes[idx].children != nil && len(nodes[idx].children) > 0 {
+				canidateSupernet := findClosestSupernet(network, nodes[idx].children)
 				if canidateSupernet != nil {
 					return canidateSupernet
 				}
-				return nd
 			}
-			return nd
+			return nodes[idx]
 		}
-		actualIndex++
+		idx++
 	}
 	return nil
 }

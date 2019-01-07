@@ -26,7 +26,7 @@ const ripePath = "src/github.com/demskie/networktree/inputdata/delegated-ripencc
 func main() {
 	t := time.Now()
 
-	tree := NewTree(32)
+	tree := NewTree(16)
 	ingest(tree, arinPath)
 	ingest(tree, ripePath)
 
