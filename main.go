@@ -17,18 +17,22 @@ import (
 	"github.com/demskie/subnetmath"
 )
 
-const arinPath = "src/github.com/demskie/networktree/inputdata/delegated-arin-extended-latest"    // https://ftp.arin.net/pub/stats/arin/
-const ripePath = "src/github.com/demskie/networktree/inputdata/delegated-ripencc-extended-latest" // https://ftp.ripe.net/ripe/stats/
-// http://ftp.apnic.net/stats/apnic/
-// http://ftp.apnic.net/stats/afrinic/
-// https://ftp.lacnic.net/pub/stats/lacnic/
+const basePath = "src/github.com/demskie/networktree/inputdata/"
+const arinPath = basePath + "delegated-arin-extended-latest"       // https://ftp.arin.net/pub/stats/arin/
+const ripePath = basePath + "delegated-ripencc-extended-latest"    // https://ftp.ripe.net/ripe/stats/
+const apnicPath = basePath + "delegated-apnic-extended-latest"     // http://ftp.apnic.net/stats/apnic/
+const afrinicPath = basePath + "delegated-afrinic-extended-latest" // http://ftp.apnic.net/stats/afrinic/
+const lacnicPath = basePath + "delegated-lacnic-extended-latest"   // https://ftp.lacnic.net/pub/stats/lacnic/
 
 func main() {
 	t := time.Now()
 
-	tree := NewTree(16)
+	tree := NewTree(32)
 	ingest(tree, arinPath)
 	ingest(tree, ripePath)
+	ingest(tree, apnicPath)
+	ingest(tree, afrinicPath)
+	ingest(tree, lacnicPath)
 
 	ticker.Stop()
 	fmt.Println("finished in", time.Since(t))
