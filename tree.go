@@ -19,6 +19,7 @@ type node struct {
 // Tree contains the root nodes
 type Tree struct {
 	roots     []*node
+	sbuf      *subnetmath.Buffer
 	precision int
 	size      int
 }
@@ -27,6 +28,7 @@ type Tree struct {
 func NewTree(precision int) *Tree {
 	return &Tree{
 		roots:     make([]*node, 0),
+		sbuf:      subnetmath.NewBuffer(),
 		precision: precision,
 	}
 }
@@ -38,7 +40,7 @@ func (tree *Tree) Size() int {
 func (tree *Tree) insert(networks []*net.IPNet, country string, position *Position) {
 	for _, network := range networks {
 		tree.size++
-		parent := findClosestSupernet(network, tree.roots)
+		parent := tree.findClosestSupernet(network, tree.roots)
 		if parent != nil && subnetmath.NetworksAreIdentical(network, parent.network) {
 			atomic.AddUint64(&parentRate, 1)
 			if parent.country == "ZZ" {
@@ -60,29 +62,29 @@ func (tree *Tree) insert(networks []*net.IPNet, country string, position *Positi
 func insertNode(tree *Tree, newNode *node) {
 	if newNode.parent != nil {
 		for _, sibling := range newNode.parent.children {
-			if subnetmath.NetworkContainsSubnet(newNode.network, sibling.network) {
+			if tree.sbuf.NetworkContainsSubnet(newNode.network, sibling.network) {
 				newNode.children = append(newNode.children, sibling)
 			}
 		}
 		for _, newChild := range newNode.children {
 			newChild.parent = newNode
-			newNode.parent.children = removeFromSortedNodes(newNode.parent.children, newChild)
+			newNode.parent.children = tree.removeFromSortedNodes(newNode.parent.children, newChild)
 		}
-		newNode.parent.children = insertIntoSortedNodes(newNode.parent.children, newNode)
+		newNode.parent.children = tree.insertIntoSortedNodes(newNode.parent.children, newNode)
 		for len(newNode.parent.children) > tree.precision {
 			splitParent(newNode.parent, tree)
 		}
 	} else {
 		for _, sibling := range tree.roots {
-			if subnetmath.NetworkContainsSubnet(newNode.network, sibling.network) {
+			if tree.sbuf.NetworkContainsSubnet(newNode.network, sibling.network) {
 				newNode.children = append(newNode.children, sibling)
 			}
 		}
 		for _, newChild := range newNode.children {
 			newChild.parent = newNode
-			tree.roots = removeFromSortedNodes(tree.roots, newChild)
+			tree.roots = tree.removeFromSortedNodes(tree.roots, newChild)
 		}
-		tree.roots = insertIntoSortedNodes(tree.roots, newNode)
+		tree.roots = tree.insertIntoSortedNodes(tree.roots, newNode)
 		if len(tree.roots) > tree.precision {
 			splitNodes(tree.roots, tree)
 		}
@@ -106,9 +108,9 @@ func splitNodes(nodes []*node, tree *Tree) {
 	tree.insert(subnets, "ZZZZZZ", nil)
 }
 
-func insertIntoSortedNodes(slc []*node, nd *node) []*node {
+func (tree *Tree) insertIntoSortedNodes(slc []*node, nd *node) []*node {
 	index := sort.Search(len(slc), func(i int) bool {
-		return subnetmath.NetworkComesBefore(nd.network, slc[i].network)
+		return tree.sbuf.NetworkComesBefore(nd.network, slc[i].network)
 	})
 	slc = append(slc, &node{})
 	copy(slc[index+1:], slc[index:])
@@ -116,9 +118,9 @@ func insertIntoSortedNodes(slc []*node, nd *node) []*node {
 	return slc
 }
 
-func removeFromSortedNodes(slc []*node, nd *node) []*node {
+func (tree *Tree) removeFromSortedNodes(slc []*node, nd *node) []*node {
 	index := sort.Search(len(slc), func(i int) bool {
-		return slc[i].network.Contains(nd.network.IP) || subnetmath.NetworkComesBefore(nd.network, slc[i].network)
+		return slc[i].network.Contains(nd.network.IP) || tree.sbuf.NetworkComesBefore(nd.network, slc[i].network)
 	})
 	if slc[index] == nd {
 		copy(slc[index:], slc[index+1:])
@@ -128,26 +130,26 @@ func removeFromSortedNodes(slc []*node, nd *node) []*node {
 	return slc
 }
 
-func findNetwork(address net.IP, nodes []*node) *node {
+func (tree *Tree) findNetwork(address net.IP, nodes []*node) *node {
 	idx := sort.Search(len(nodes), func(i int) bool {
-		return nodes[i].network.Contains(address) || subnetmath.AddressComesBefore(address, nodes[i].network.IP)
+		return nodes[i].network.Contains(address) || tree.sbuf.AddressComesBefore(address, nodes[i].network.IP)
 	})
 	if idx < len(nodes) {
 		if nodes[idx].children != nil && len(nodes[idx].children) > 0 {
-			return findNetwork(address, nodes[idx].children)
+			return tree.findNetwork(address, nodes[idx].children)
 		}
 		return nodes[idx]
 	}
 	return nil
 }
 
-func findClosestSupernet(network *net.IPNet, nodes []*node) *node {
+func (tree *Tree) findClosestSupernet(network *net.IPNet, nodes []*node) *node {
 	idx := sort.Search(len(nodes), func(i int) bool {
-		return nodes[i].network.Contains(network.IP) || subnetmath.NetworkComesBefore(network, nodes[i].network)
+		return nodes[i].network.Contains(network.IP) || tree.sbuf.NetworkComesBefore(network, nodes[i].network)
 	})
-	if idx < len(nodes) && subnetmath.NetworkContainsSubnet(nodes[idx].network, network) {
+	if idx < len(nodes) && tree.sbuf.NetworkContainsSubnet(nodes[idx].network, network) {
 		if nodes[idx].children != nil && len(nodes[idx].children) > 0 {
-			canidateSupernet := findClosestSupernet(network, nodes[idx].children)
+			canidateSupernet := tree.findClosestSupernet(network, nodes[idx].children)
 			if canidateSupernet != nil {
 				return canidateSupernet
 			}
