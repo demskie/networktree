@@ -98,14 +98,14 @@ func splitParent(parent *node, tree *Tree) {
 		tree.insert([]*net.IPNet{
 			smallerNetwork,
 			subnetmath.NextNetwork(smallerNetwork),
-		}, "ZZZZZZ", nil)
+		}, "ZZ", nil)
 	}
 }
 
 func splitNodes(nodes []*node, tree *Tree) {
 	lastAddr := subnetmath.BroadcastAddr(nodes[len(nodes)-1].network)
 	subnets := subnetmath.FindInbetweenSubnets(nodes[0].network.IP, lastAddr)
-	tree.insert(subnets, "ZZZZZZ", nil)
+	tree.insert(subnets, "ZZ", nil)
 }
 
 func (tree *Tree) insertIntoSortedNodes(slc []*node, nd *node) []*node {

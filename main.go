@@ -51,7 +51,7 @@ func main() {
 		}
 	}()
 
-	tree := NewTree(1024)
+	tree := NewTree(32)
 	ingest(tree, arinPath)
 	ingest(tree, ripePath)
 	ingest(tree, apnicPath)
