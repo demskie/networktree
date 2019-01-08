@@ -9,7 +9,10 @@ import (
 	"math/big"
 	"net"
 	"os"
+	"os/signal"
 	"path"
+	"runtime"
+	"runtime/pprof"
 	"strconv"
 	"sync/atomic"
 	"time"
@@ -26,6 +29,27 @@ const lacnicPath = basePath + "delegated-lacnic-extended-latest"   // https://ft
 
 func main() {
 	t := time.Now()
+
+	cpuProf, err := os.Create("cpu.prof")
+	if err != nil {
+		log.Fatal(err)
+	}
+	pprof.StartCPUProfile(cpuProf)
+	defer pprof.StopCPUProfile()
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
+	go func() {
+		for range c {
+			pprof.StopCPUProfile()
+			runtime.GC()
+			heapProf, err := os.Create("heap.prof")
+			if err != nil {
+				log.Fatal(err)
+			}
+			pprof.WriteHeapProfile(heapProf)
+			os.Exit(1)
+		}
+	}()
 
 	tree := NewTree(32)
 	ingest(tree, arinPath)

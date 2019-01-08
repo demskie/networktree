@@ -15,6 +15,7 @@ func createBenchTree32() {
 		ticker.Stop()
 		benchTree32 = NewTree(32)
 		ingest(benchTree32, arinPath)
+		ingest(benchTree32, ripePath)
 	}
 }
 
@@ -40,7 +41,7 @@ func TestClosestSupernet(t *testing.T) {
 
 func BenchmarkFindNetwork(b *testing.B) {
 	createBenchTree32()
-	addr := net.ParseIP("8.8.8.8")
+	addr := net.ParseIP("185.48.252.0")
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		findNetwork(addr, benchTree32.roots)
@@ -49,7 +50,7 @@ func BenchmarkFindNetwork(b *testing.B) {
 
 func BenchmarkFindClosestSupernet(b *testing.B) {
 	createBenchTree32()
-	network := subnetmath.ParseNetworkCIDR("8.8.8.8/8")
+	network := subnetmath.ParseNetworkCIDR("185.48.252.0/22")
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		findClosestSupernet(network, benchTree32.roots)
