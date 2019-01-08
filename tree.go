@@ -53,8 +53,7 @@ func (tree *Tree) insert(networks []*net.IPNet, country string, position *Positi
 			} else {
 				atomic.AddUint64(&noParentRate, 1)
 			}
-			newNode := &node{network, country, position, parent, nil}
-			insertNode(tree, newNode)
+			insertNode(tree, &node{network, country, position, parent, nil})
 		}
 	}
 }

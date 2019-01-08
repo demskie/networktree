@@ -94,6 +94,8 @@ func ingest(tree *Tree, p string) {
 	reader := csv.NewReader(bufio.NewReader(txtFile))
 	reader.Comma = '|'
 
+	sbuf := subnetmath.NewBuffer()
+
 	for {
 		lineColumns, err := reader.Read()
 		if err == io.EOF {
@@ -111,7 +113,7 @@ func ingest(tree *Tree, p string) {
 		stopBigInt.Add(stopBigInt, big.NewInt(int64(increment)))
 		stopBigInt.Sub(stopBigInt, big.NewInt(1))
 		stopAddr := subnetmath.IntToAddr(stopBigInt)
-		networks := subnetmath.FindInbetweenSubnets(startAddr, stopAddr)
+		networks := sbuf.FindInbetweenSubnets(startAddr, stopAddr)
 		country := lineColumns[1]
 		if country == "" {
 			country = "ZZ"
