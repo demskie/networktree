@@ -103,7 +103,7 @@ func splitParent(parent *node, tree *Tree) {
 
 func splitNodes(nodes []*node, tree *Tree) {
 	lastAddr := subnetmath.BroadcastAddr(nodes[len(nodes)-1].network)
-	subnets := subnetmath.FindInbetweenSubnets(nodes[0].network.IP, lastAddr)
+	subnets := tree.sbuf.FindInbetweenSubnets(nodes[0].network.IP, lastAddr)
 	tree.insert(subnets, "ZZ", nil)
 }
 
