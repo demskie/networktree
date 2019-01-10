@@ -15,8 +15,10 @@ type nodeJSON struct {
 
 func (t *Tree) JSON() string {
 	var treeJSON []nodeJSON
-	for _, n := range t.roots {
-		treeJSON = append(treeJSON, buildJSON(n))
+	for _, r := range [][]*node{t.roots, t.rootsV6} {
+		for _, n := range r {
+			treeJSON = append(treeJSON, buildJSON(n))
+		}
 	}
 	b, _ := json.MarshalIndent(&treeJSON, "", "  ")
 	return string(b)
