@@ -52,16 +52,16 @@ func (tree *Tree) insert(networks []*net.IPNet, country string, position *Positi
 			parent = tree.findClosestSupernet(network, tree.rootsV6)
 		}
 		if parent != nil && subnetmath.NetworksAreIdentical(network, parent.network) {
-			atomic.AddUint64(&parentRate, 1)
+			atomic.AddUint64(&counters.parentRate, 1)
 			if parent.country == "ZZ" {
 				parent.country = country
 				parent.position = position
 			}
 		} else {
 			if parent != nil {
-				atomic.AddUint64(&parentRate, 1)
+				atomic.AddUint64(&counters.parentRate, 1)
 			} else {
-				atomic.AddUint64(&noParentRate, 1)
+				atomic.AddUint64(&counters.noParentRate, 1)
 			}
 			insertNode(tree, &node{network, country, position, parent, nil})
 			tree.size++
