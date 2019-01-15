@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/gob"
 	"fmt"
 	"log"
 	"os"
@@ -18,33 +19,43 @@ const apnicPath = basePath + "delegated-apnic-extended-latest"     // http://ftp
 const afrinicPath = basePath + "delegated-afrinic-extended-latest" // http://ftp.apnic.net/stats/afrinic/
 const lacnicPath = basePath + "delegated-lacnic-extended-latest"   // https://ftp.lacnic.net/pub/stats/lacnic/
 
-// https://dev.maxmind.com/geoip/geoip2/geolite2/
-
 func main() {
 	profileStart()
 	defer pprof.StopCPUProfile()
 
 	t := time.Now()
-	tree := NewTree(64)
-
+	tree := NewTree(128)
 	catchBreakSequenceForDebug(tree)
-
 	counters = startCounting()
 
-	ingest(tree, arinPath)
-	ingest(tree, ripePath)
-	ingest(tree, apnicPath)
-	ingest(tree, afrinicPath)
-	ingest(tree, lacnicPath)
+	ingestGeoliteData(tree)
 
 	counters.ticker.Stop()
 
 	fmt.Println("finished in", time.Since(t))
 
-	f, _ := os.Create("output.json")
+	runtime.GC()
+	heapProf, err := os.Create("heap.prof")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer heapProf.Close()
+	pprof.WriteHeapProfile(heapProf)
+
+	os.Exit(1)
+
+	f, err := os.Create("output.gob")
 	f.Truncate(0)
 	f.Seek(0, 0)
-	f.WriteString(tree.JSON())
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer f.Close()
+	gob.NewEncoder(f).Encode(tree)
+
+	// f.Truncate(0)
+	// f.Seek(0, 0)
+	// f.WriteString(tree.JSON())
 }
 
 func profileStart() {
